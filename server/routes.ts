@@ -36,7 +36,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) {
       return res.sendStatus(401);
     }
-    const photos = await storage.getPhotos();
+    const photos = await storage.getPhotosWithUsernames();
     res.json(photos);
   });
 

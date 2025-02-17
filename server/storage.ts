@@ -4,14 +4,15 @@ import createMemoryStore from "memorystore";
 
 const MemoryStore = createMemoryStore(session);
 
-const MOCK_PHOTOS: Photo[] = [
+const MOCK_PHOTOS: (Photo & { username: string })[] = [
   {
     id: 1,
     userId: 1,
     filename: "exemplo1.jpg",
     description: "First day of school celebration",
     takenAt: new Date("2024-02-01"),
-    likes: 12
+    likes: 12,
+    username: "usuario1"
   },
   {
     id: 2,
@@ -19,7 +20,8 @@ const MOCK_PHOTOS: Photo[] = [
     filename: "exemplo2.jpg",
     description: "Graduation ceremony",
     takenAt: new Date("2024-01-15"),
-    likes: 8
+    likes: 8,
+    username: "usuario1"
   },
   {
     id: 3,
@@ -27,7 +29,8 @@ const MOCK_PHOTOS: Photo[] = [
     filename: "exemplo3.jpg",
     description: "Science fair projects",
     takenAt: new Date("2024-01-20"),
-    likes: 15
+    likes: 15,
+    username: "usuario2"
   }
 ];
 
@@ -36,6 +39,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getPhotos(): Promise<Photo[]>;
+  getPhotosWithUsernames(): Promise<(Photo & { username: string })[]>;
   createPhoto(userId: number, photo: InsertPhoto): Promise<Photo>;
   deletePhoto(id: number, userId: number): Promise<void>;
   likePhoto(id: number): Promise<Photo>;
@@ -51,7 +55,7 @@ export class MemStorage implements IStorage {
 
   constructor() {
     this.users = new Map();
-    this.photos = [...MOCK_PHOTOS];
+    this.photos = MOCK_PHOTOS;
     this.currentId = 1;
     this.currentPhotoId = this.photos.length + 1;
     this.sessionStore = new MemoryStore({
@@ -80,6 +84,16 @@ export class MemStorage implements IStorage {
     return this.photos;
   }
 
+  async getPhotosWithUsernames(): Promise<(Photo & { username: string })[]> {
+    return this.photos.map(photo => {
+      const user = this.users.get(photo.userId);
+      return {
+        ...photo,
+        username: user?.username || "Usuário desconhecido"
+      };
+    });
+  }
+
   async createPhoto(userId: number, insertPhoto: InsertPhoto): Promise<Photo> {
     const id = this.currentPhotoId++;
     const photo: Photo = {
@@ -95,7 +109,7 @@ export class MemStorage implements IStorage {
   async deletePhoto(id: number, userId: number): Promise<void> {
     const index = this.photos.findIndex(p => p.id === id && p.userId === userId);
     if (index === -1) {
-      throw new Error("Photo not found or you don't have permission to delete it");
+      throw new Error("Foto não encontrada ou você não tem permissão para deletá-la");
     }
     this.photos.splice(index, 1);
   }
@@ -103,7 +117,7 @@ export class MemStorage implements IStorage {
   async likePhoto(id: number): Promise<Photo> {
     const photo = this.photos.find(p => p.id === id);
     if (!photo) {
-      throw new Error("Photo not found");
+      throw new Error("Foto não encontrada");
     }
     photo.likes += 1;
     return photo;

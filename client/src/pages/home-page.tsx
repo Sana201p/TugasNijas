@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Avatar } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Heart, LogOut, Upload, Trash2 } from "lucide-react";
+import { Heart, LogOut, Upload, Trash2, User } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -37,11 +38,11 @@ export default function HomePage() {
     resolver: zodResolver(insertPhotoSchema),
     defaultValues: {
       description: "",
-      takenAt: new Date().toISOString(),
+      takenAt: new Date().toISOString().split('T')[0],
     },
   });
 
-  const { data: photos, isLoading } = useQuery<Photo[]>({
+  const { data: photos, isLoading } = useQuery<(Photo & { username: string })[]>({
     queryKey: ["/api/photos"],
   });
 
@@ -114,12 +115,12 @@ export default function HomePage() {
               <DialogTrigger asChild>
                 <Button>
                   <Upload className="h-4 w-4 mr-2" />
-                  Upload Photo
+                  Upload Foto
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Upload a New Photo</DialogTitle>
+                  <DialogTitle>Upload de Nova Foto</DialogTitle>
                 </DialogHeader>
                 <form
                   onSubmit={form.handleSubmit((data) => {
@@ -174,10 +175,10 @@ export default function HomePage() {
                 </form>
               </DialogContent>
             </Dialog>
-            <span>Welcome, {user?.username}</span>
+            <span>Bem-vindo, {user?.username}</span>
             <Button variant="outline" onClick={() => logoutMutation.mutate()}>
               <LogOut className="h-4 w-4 mr-2" />
-              Logout
+              Sair
             </Button>
           </div>
         </div>
@@ -187,18 +188,26 @@ export default function HomePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {photos?.map((photo) => (
             <Card key={photo.id} className="overflow-hidden">
-              <CardHeader className="p-0">
+              <CardHeader className="p-4 pb-0">
+                <div className="flex items-center gap-2">
+                  <Avatar>
+                    <User className="h-4 w-4" />
+                  </Avatar>
+                  <span className="font-medium">{photo.username}</span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 mt-4">
                 <img
                   src={`/uploads/${photo.filename}`}
                   alt={photo.description}
                   className="w-full h-64 object-cover"
                 />
-              </CardHeader>
-              <CardContent className="p-4">
-                <CardTitle className="text-lg">{photo.description}</CardTitle>
-                <CardDescription>
-                  {format(new Date(photo.takenAt), "MMMM d, yyyy")}
-                </CardDescription>
+                <div className="p-4">
+                  <CardTitle className="text-lg">{photo.description}</CardTitle>
+                  <CardDescription>
+                    {format(new Date(photo.takenAt), "dd 'de' MMMM 'de' yyyy")}
+                  </CardDescription>
+                </div>
               </CardContent>
               <CardFooter className="p-4 pt-0 flex justify-between items-center">
                 <Button
@@ -215,7 +224,7 @@ export default function HomePage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      if (confirm("Are you sure you want to delete this photo?")) {
+                      if (confirm("Tem certeza que deseja deletar esta foto?")) {
                         deleteMutation.mutate(photo.id);
                       }
                     }}
