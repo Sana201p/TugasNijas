@@ -38,7 +38,6 @@ export default function HomePage() {
     resolver: zodResolver(insertPhotoSchema),
     defaultValues: {
       description: "",
-      takenAt: new Date().toISOString().split('T')[0],
     },
   });
 
@@ -136,7 +135,6 @@ export default function HomePage() {
                     }
                     formData.append('photo', photoInput.files[0]);
                     formData.append('description', data.description);
-                    formData.append('takenAt', data.takenAt);
                     uploadMutation.mutate(formData);
                   })}
                   className="space-y-4"
@@ -155,14 +153,6 @@ export default function HomePage() {
                       id="description"
                       placeholder="Descreva este momento..."
                       {...form.register("description")}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="takenAt">Data</Label>
-                    <Input
-                      id="takenAt"
-                      type="date"
-                      {...form.register("takenAt")}
                     />
                   </div>
                   <Button
@@ -204,9 +194,6 @@ export default function HomePage() {
                 />
                 <div className="p-4">
                   <CardTitle className="text-lg">{photo.description}</CardTitle>
-                  <CardDescription>
-                    {format(new Date(photo.takenAt), "dd 'de' MMMM 'de' yyyy")}
-                  </CardDescription>
                 </div>
               </CardContent>
               <CardFooter className="p-4 pt-0 flex justify-between items-center">

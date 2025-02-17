@@ -13,7 +13,6 @@ export const photos = pgTable("photos", {
   userId: integer("user_id").notNull(),
   filename: text("filename").notNull(),
   description: text("description").notNull(),
-  takenAt: timestamp("taken_at").notNull(),
   likes: integer("likes").notNull().default(0),
 });
 
@@ -25,7 +24,6 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export const insertPhotoSchema = createInsertSchema(photos).pick({
   filename: true,
   description: true,
-  takenAt: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

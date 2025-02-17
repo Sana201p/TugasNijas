@@ -46,7 +46,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPhotos(): Promise<Photo[]> {
-    return await db.select().from(photos).orderBy(desc(photos.takenAt));
+    return await db.select().from(photos);
   }
 
   async getPhotosWithUsernames(): Promise<(Photo & { username: string })[]> {
@@ -57,13 +57,11 @@ export class DatabaseStorage implements IStorage {
         userId: photos.userId,
         filename: photos.filename,
         description: photos.description,
-        takenAt: photos.takenAt,
         likes: photos.likes,
         username: users.username,
       })
       .from(photos)
-      .innerJoin(users, eq(photos.userId, users.id))
-      .orderBy(desc(photos.takenAt));
+      .innerJoin(users, eq(photos.userId, users.id));
 
     return results as PhotoWithUsername[];
   }
