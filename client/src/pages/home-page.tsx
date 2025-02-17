@@ -5,7 +5,6 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -22,52 +21,55 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Heart, LogOut, Upload, Trash2, User } from "lucide-react";
-import { format } from "date-fns";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { insertPhotoSchema } from "@shared/schema";
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-
-  const form = useForm({
-    resolver: zodResolver(insertPhotoSchema),
-    defaultValues: {
-      description: "",
-    },
-  });
+  const [description, setDescription] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const { data: photos, isLoading } = useQuery<(Photo & { username: string })[]>({
     queryKey: ["/api/photos"],
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async (data: FormData) => {
+    mutationFn: async () => {
+      if (!selectedFile) throw new Error('Selecione uma foto');
+
+      const formData = new FormData();
+      formData.append('photo', selectedFile);
+      formData.append('description', description || 'Sem descrição');
+
       const res = await fetch('/api/photos', {
         method: 'POST',
-        body: data,
+        body: formData,
         credentials: 'include'
       });
-      if (!res.ok) throw new Error('Erro ao fazer upload');
+
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error);
+      }
+
       return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/photos"] });
       setIsUploadOpen(false);
-      form.reset();
+      setDescription("");
+      setSelectedFile(null);
       toast({
         title: "Sucesso",
         description: "Foto enviada com sucesso",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Erro",
-        description: "Erro ao enviar a foto: " + error.message,
+        description: error.message,
         variant: "destructive"
       });
     }
@@ -99,10 +101,29 @@ export default function HomePage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-pulse">Loading...</div>
+        <div className="animate-pulse">Carregando...</div>
       </div>
     );
   }
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleUpload = () => {
+    if (!selectedFile) {
+      toast({
+        title: "Erro",
+        description: "Por favor selecione uma foto",
+        variant: "destructive"
+      });
+      return;
+    }
+    uploadMutation.mutate();
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -121,30 +142,14 @@ export default function HomePage() {
                 <DialogHeader>
                   <DialogTitle>Upload de Nova Foto</DialogTitle>
                 </DialogHeader>
-                <form
-                  onSubmit={form.handleSubmit((data) => {
-                    const formData = new FormData();
-                    const photoInput = document.getElementById('photo') as HTMLInputElement;
-                    if (!photoInput.files?.[0]) {
-                      toast({
-                        title: "Erro",
-                        description: "Por favor selecione uma foto",
-                        variant: "destructive"
-                      });
-                      return;
-                    }
-                    formData.append('photo', photoInput.files[0]);
-                    formData.append('description', data.description);
-                    uploadMutation.mutate(formData);
-                  })}
-                  className="space-y-4"
-                >
+                <div className="space-y-4">
                   <div>
                     <Label htmlFor="photo">Foto</Label>
                     <Input
                       id="photo"
                       type="file"
                       accept="image/*"
+                      onChange={handleFileChange}
                     />
                   </div>
                   <div>
@@ -152,17 +157,18 @@ export default function HomePage() {
                     <Input
                       id="description"
                       placeholder="Descreva este momento..."
-                      {...form.register("description")}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
                     />
                   </div>
                   <Button
-                    type="submit"
+                    onClick={handleUpload}
                     className="w-full"
                     disabled={uploadMutation.isPending}
                   >
-                    Upload
+                    {uploadMutation.isPending ? "Enviando..." : "Upload"}
                   </Button>
-                </form>
+                </div>
               </DialogContent>
             </Dialog>
             <span>Bem-vindo, {user?.username}</span>

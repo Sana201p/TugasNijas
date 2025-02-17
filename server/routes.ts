@@ -5,9 +5,16 @@ import { storage } from "./storage";
 import { insertPhotoSchema } from "@shared/schema";
 import multer from "multer";
 import path from "path";
+import fs from "fs";
+
+// Criar pasta de uploads se não existir
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
 
 const storage_config = multer.diskStorage({
-  destination: "uploads/",
+  destination: uploadsDir,
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
@@ -41,28 +48,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/photos", upload.single('photo'), async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.sendStatus(401);
-    }
+    try {
+      if (!req.isAuthenticated()) {
+        return res.sendStatus(401);
+      }
 
-    if (!req.file) {
-      return res.status(400).json({ message: "Nenhuma foto foi enviada" });
-    }
+      if (!req.file) {
+        return res.status(400).json({ message: "Nenhuma foto foi enviada" });
+      }
 
-    const parseResult = insertPhotoSchema.safeParse(req.body);
-    if (!parseResult.success) {
-      return res.status(400).json(parseResult.error);
-    }
+      const photo = await storage.createPhoto(req.user!.id, {
+        filename: req.file.filename,
+        description: req.body.description || "Sem descrição",
+      });
 
-    const photo = await storage.createPhoto(req.user!.id, {
-      ...parseResult.data,
-      filename: req.file.filename,
-    });
-    res.status(201).json(photo);
+      res.status(201).json(photo);
+    } catch (error) {
+      console.error('Erro no upload:', error);
+      res.status(500).json({ message: "Erro ao fazer upload da foto" });
+    }
   });
 
   app.get("/uploads/:filename", (req, res) => {
-    res.sendFile(path.join(process.cwd(), "uploads", req.params.filename));
+    const filePath = path.join(uploadsDir, req.params.filename);
+    res.sendFile(filePath);
   });
 
   app.delete("/api/photos/:id", async (req, res) => {
