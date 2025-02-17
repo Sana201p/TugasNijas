@@ -8,7 +8,7 @@ const MOCK_PHOTOS: Photo[] = [
   {
     id: 1,
     userId: 1,
-    imageUrl: "https://source.unsplash.com/random/800x600?school=1",
+    filename: "exemplo1.jpg",
     description: "First day of school celebration",
     takenAt: new Date("2024-02-01"),
     likes: 12
@@ -16,7 +16,7 @@ const MOCK_PHOTOS: Photo[] = [
   {
     id: 2,
     userId: 1,
-    imageUrl: "https://source.unsplash.com/random/800x600?graduation=1",
+    filename: "exemplo2.jpg",
     description: "Graduation ceremony",
     takenAt: new Date("2024-01-15"),
     likes: 8
@@ -24,7 +24,7 @@ const MOCK_PHOTOS: Photo[] = [
   {
     id: 3,
     userId: 2,
-    imageUrl: "https://source.unsplash.com/random/800x600?classroom=1",
+    filename: "exemplo3.jpg",
     description: "Science fair projects",
     takenAt: new Date("2024-01-20"),
     likes: 15
