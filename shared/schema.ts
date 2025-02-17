@@ -11,7 +11,7 @@ export const users = pgTable("users", {
 export const photos = pgTable("photos", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
-  imageUrl: text("image_url").notNull(),
+  filename: text("filename").notNull(),
   description: text("description").notNull(),
   takenAt: timestamp("taken_at").notNull(),
   likes: integer("likes").notNull().default(0),
@@ -23,7 +23,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
 });
 
 export const insertPhotoSchema = createInsertSchema(photos).pick({
-  imageUrl: true,
+  filename: true, // Corrected to include filename
   description: true,
   takenAt: true,
 });

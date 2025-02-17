@@ -36,7 +36,6 @@ export default function HomePage() {
   const form = useForm({
     resolver: zodResolver(insertPhotoSchema),
     defaultValues: {
-      imageUrl: "",
       description: "",
       takenAt: new Date().toISOString(),
     },
@@ -47,8 +46,13 @@ export default function HomePage() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async (data: typeof form.getValues) => {
-      const res = await apiRequest("POST", "/api/photos", data);
+    mutationFn: async (data: FormData) => {
+      const res = await fetch('/api/photos', {
+        method: 'POST',
+        body: data,
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Erro ao fazer upload');
       return await res.json();
     },
     onSuccess: () => {
@@ -56,10 +60,17 @@ export default function HomePage() {
       setIsUploadOpen(false);
       form.reset();
       toast({
-        title: "Success",
-        description: "Photo uploaded successfully",
+        title: "Sucesso",
+        description: "Foto enviada com sucesso",
       });
     },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar a foto: " + error.message,
+        variant: "destructive"
+      });
+    }
   });
 
   const deleteMutation = useMutation({
@@ -69,8 +80,8 @@ export default function HomePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/photos"] });
       toast({
-        title: "Success",
-        description: "Photo deleted successfully",
+        title: "Sucesso",
+        description: "Foto deletada com sucesso",
       });
     },
   });
@@ -111,27 +122,42 @@ export default function HomePage() {
                   <DialogTitle>Upload a New Photo</DialogTitle>
                 </DialogHeader>
                 <form
-                  onSubmit={form.handleSubmit((data) => uploadMutation.mutate(data))}
+                  onSubmit={form.handleSubmit((data) => {
+                    const formData = new FormData();
+                    const photoInput = document.getElementById('photo') as HTMLInputElement;
+                    if (!photoInput.files?.[0]) {
+                      toast({
+                        title: "Erro",
+                        description: "Por favor selecione uma foto",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    formData.append('photo', photoInput.files[0]);
+                    formData.append('description', data.description);
+                    formData.append('takenAt', data.takenAt);
+                    uploadMutation.mutate(formData);
+                  })}
                   className="space-y-4"
                 >
                   <div>
-                    <Label htmlFor="imageUrl">Image URL</Label>
+                    <Label htmlFor="photo">Foto</Label>
                     <Input
-                      id="imageUrl"
-                      placeholder="https://example.com/image.jpg"
-                      {...form.register("imageUrl")}
+                      id="photo"
+                      type="file"
+                      accept="image/*"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="description">Description</Label>
+                    <Label htmlFor="description">Descrição</Label>
                     <Input
                       id="description"
-                      placeholder="Describe this moment..."
+                      placeholder="Descreva este momento..."
                       {...form.register("description")}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="takenAt">Date Taken</Label>
+                    <Label htmlFor="takenAt">Data</Label>
                     <Input
                       id="takenAt"
                       type="date"
@@ -163,7 +189,7 @@ export default function HomePage() {
             <Card key={photo.id} className="overflow-hidden">
               <CardHeader className="p-0">
                 <img
-                  src={photo.imageUrl}
+                  src={`/uploads/${photo.filename}`}
                   alt={photo.description}
                   className="w-full h-64 object-cover"
                 />
