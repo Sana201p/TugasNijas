@@ -36,6 +36,8 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getPhotos(): Promise<Photo[]>;
+  createPhoto(userId: number, photo: InsertPhoto): Promise<Photo>;
+  deletePhoto(id: number, userId: number): Promise<void>;
   likePhoto(id: number): Promise<Photo>;
   sessionStore: session.Store;
 }
@@ -44,12 +46,14 @@ export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private photos: Photo[];
   private currentId: number;
+  private currentPhotoId: number;
   sessionStore: session.Store;
 
   constructor() {
     this.users = new Map();
     this.photos = [...MOCK_PHOTOS];
     this.currentId = 1;
+    this.currentPhotoId = this.photos.length + 1;
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000,
     });
@@ -74,6 +78,26 @@ export class MemStorage implements IStorage {
 
   async getPhotos(): Promise<Photo[]> {
     return this.photos;
+  }
+
+  async createPhoto(userId: number, insertPhoto: InsertPhoto): Promise<Photo> {
+    const id = this.currentPhotoId++;
+    const photo: Photo = {
+      ...insertPhoto,
+      id,
+      userId,
+      likes: 0
+    };
+    this.photos.push(photo);
+    return photo;
+  }
+
+  async deletePhoto(id: number, userId: number): Promise<void> {
+    const index = this.photos.findIndex(p => p.id === id && p.userId === userId);
+    if (index === -1) {
+      throw new Error("Photo not found or you don't have permission to delete it");
+    }
+    this.photos.splice(index, 1);
   }
 
   async likePhoto(id: number): Promise<Photo> {

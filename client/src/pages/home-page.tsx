@@ -11,14 +11,68 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Heart, LogOut } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Heart, LogOut, Upload, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { useToast } from "@/hooks/use-toast";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertPhotoSchema } from "@shared/schema";
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
+  const { toast } = useToast();
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+
+  const form = useForm({
+    resolver: zodResolver(insertPhotoSchema),
+    defaultValues: {
+      imageUrl: "",
+      description: "",
+      takenAt: new Date().toISOString(),
+    },
+  });
 
   const { data: photos, isLoading } = useQuery<Photo[]>({
     queryKey: ["/api/photos"],
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async (data: typeof form.getValues) => {
+      const res = await apiRequest("POST", "/api/photos", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/photos"] });
+      setIsUploadOpen(false);
+      form.reset();
+      toast({
+        title: "Success",
+        description: "Photo uploaded successfully",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (photoId: number) => {
+      await apiRequest("DELETE", `/api/photos/${photoId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/photos"] });
+      toast({
+        title: "Success",
+        description: "Photo deleted successfully",
+      });
+    },
   });
 
   const likeMutation = useMutation({
@@ -45,6 +99,55 @@ export default function HomePage() {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">School Timeline</h1>
           <div className="flex items-center gap-4">
+            <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Photo
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Upload a New Photo</DialogTitle>
+                </DialogHeader>
+                <form
+                  onSubmit={form.handleSubmit((data) => uploadMutation.mutate(data))}
+                  className="space-y-4"
+                >
+                  <div>
+                    <Label htmlFor="imageUrl">Image URL</Label>
+                    <Input
+                      id="imageUrl"
+                      placeholder="https://example.com/image.jpg"
+                      {...form.register("imageUrl")}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="description">Description</Label>
+                    <Input
+                      id="description"
+                      placeholder="Describe this moment..."
+                      {...form.register("description")}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="takenAt">Date Taken</Label>
+                    <Input
+                      id="takenAt"
+                      type="date"
+                      {...form.register("takenAt")}
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={uploadMutation.isPending}
+                  >
+                    Upload
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
             <span>Welcome, {user?.username}</span>
             <Button variant="outline" onClick={() => logoutMutation.mutate()}>
               <LogOut className="h-4 w-4 mr-2" />
@@ -81,6 +184,20 @@ export default function HomePage() {
                   <Heart className="h-4 w-4 mr-2" />
                   {photo.likes} likes
                 </Button>
+                {photo.userId === user?.id && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (confirm("Are you sure you want to delete this photo?")) {
+                        deleteMutation.mutate(photo.id);
+                      }
+                    }}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           ))}
