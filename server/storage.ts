@@ -1,38 +1,12 @@
 import { User, InsertUser, Photo, InsertPhoto } from "@shared/schema";
+import { users, photos } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import connectPg from "connect-pg-simple";
+import { pool } from "./db";
 
-const MemoryStore = createMemoryStore(session);
-
-const MOCK_PHOTOS: (Photo & { username: string })[] = [
-  {
-    id: 1,
-    userId: 1,
-    filename: "exemplo1.jpg",
-    description: "First day of school celebration",
-    takenAt: new Date("2024-02-01"),
-    likes: 12,
-    username: "usuario1"
-  },
-  {
-    id: 2,
-    userId: 1,
-    filename: "exemplo2.jpg",
-    description: "Graduation ceremony",
-    takenAt: new Date("2024-01-15"),
-    likes: 8,
-    username: "usuario1"
-  },
-  {
-    id: 3,
-    userId: 2,
-    filename: "exemplo3.jpg",
-    description: "Science fair projects",
-    takenAt: new Date("2024-01-20"),
-    likes: 15,
-    username: "usuario2"
-  }
-];
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -46,82 +20,86 @@ export interface IStorage {
   sessionStore: session.Store;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private photos: Photo[];
-  private currentId: number;
-  private currentPhotoId: number;
+export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    this.users = new Map();
-    this.photos = MOCK_PHOTOS;
-    this.currentId = 1;
-    this.currentPhotoId = this.photos.length + 1;
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000,
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true,
     });
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentId++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
   async getPhotos(): Promise<Photo[]> {
-    return this.photos;
+    return await db.select().from(photos).orderBy(desc(photos.takenAt));
   }
 
   async getPhotosWithUsernames(): Promise<(Photo & { username: string })[]> {
-    return this.photos.map(photo => {
-      const user = this.users.get(photo.userId);
-      return {
-        ...photo,
-        username: user?.username || "Usuário desconhecido"
-      };
-    });
+    type PhotoWithUsername = Photo & { username: string };
+    const results = await db
+      .select({
+        id: photos.id,
+        userId: photos.userId,
+        filename: photos.filename,
+        description: photos.description,
+        takenAt: photos.takenAt,
+        likes: photos.likes,
+        username: users.username,
+      })
+      .from(photos)
+      .innerJoin(users, eq(photos.userId, users.id))
+      .orderBy(desc(photos.takenAt));
+
+    return results as PhotoWithUsername[];
   }
 
   async createPhoto(userId: number, insertPhoto: InsertPhoto): Promise<Photo> {
-    const id = this.currentPhotoId++;
-    const photo: Photo = {
-      ...insertPhoto,
-      id,
-      userId,
-      likes: 0
-    };
-    this.photos.push(photo);
+    const [photo] = await db
+      .insert(photos)
+      .values({ ...insertPhoto, userId, likes: 0 })
+      .returning();
     return photo;
   }
 
   async deletePhoto(id: number, userId: number): Promise<void> {
-    const index = this.photos.findIndex(p => p.id === id && p.userId === userId);
-    if (index === -1) {
+    const result = await db
+      .delete(photos)
+      .where(eq(photos.id, id))
+      .returning();
+
+    if (result.length === 0) {
       throw new Error("Foto não encontrada ou você não tem permissão para deletá-la");
     }
-    this.photos.splice(index, 1);
   }
 
   async likePhoto(id: number): Promise<Photo> {
-    const photo = this.photos.find(p => p.id === id);
+    const [photo] = await db
+      .update(photos)
+      .set((photo) => ({ likes: photo.likes + 1 }))
+      .where(eq(photos.id, id))
+      .returning();
+
     if (!photo) {
       throw new Error("Foto não encontrada");
     }
-    photo.likes += 1;
+
     return photo;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

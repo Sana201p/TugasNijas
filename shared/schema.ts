@@ -23,7 +23,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
 });
 
 export const insertPhotoSchema = createInsertSchema(photos).pick({
-  filename: true, // Corrected to include filename
+  filename: true,
   description: true,
   takenAt: true,
 });
